@@ -48,6 +48,8 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
   <option value="spa+eng" selected>Español e inglés</option>
 </select>
 <label class="check"><input id="ocr" type="checkbox" checked>Usar OCR en páginas escaneadas o sin texto seleccionable</label>
+<label class="check"><input id="forceOCR" type="checkbox">Forzar OCR en todas las páginas (más lento)</label>
+<label class="check"><input id="preserveImages" type="checkbox" checked>Conservar las páginas originales como imágenes dentro del EPUB</label>
 <label class="check"><input id="chapters" type="checkbox" checked>Intentar detectar capítulos y crear un índice</label>
 <label class="check"><input id="pageBreaks" type="checkbox" checked>Comenzar cada capítulo en una página nueva</label>
 <button id="convert" disabled>Convertir a EPUB</button>
@@ -109,11 +111,17 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
   }
 
   function canvasForPage(page) {
-    const viewport = page.getViewport({scale:1.55});
+    const viewport = page.getViewport({scale:1.35});
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.floor(viewport.width));
     canvas.height = Math.max(1, Math.floor(viewport.height));
     return page.render({canvasContext:canvas.getContext('2d',{willReadFrequently:false}), viewport}).promise.then(()=>canvas);
+  }
+
+  function canvasToJpeg(canvas, quality=0.82) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo preparar la imagen de una página.')), 'image/jpeg', quality);
+    });
   }
 
   function makeParagraphs(pageLines, useChapters) {
@@ -174,7 +182,10 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
       st.textContent = 'Abriendo PDF…';
       const pdf = await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
       const pageLines = [];
+      const pageImages = [];
       const useOCR = $('ocr').checked;
+      const forceOCR = $('forceOCR').checked;
+      const preserveImages = $('preserveImages').checked;
       let ocrDone = false;
       const lang = $('lang').value;
 
@@ -183,7 +194,16 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
         const page = await pdf.getPage(n);
         let lines = textFromItems((await page.getTextContent()).items);
         const visibleChars = lines.join(' ').replace(/\s/g,'').length;
-        if (useOCR && visibleChars < 25) {
+        const shouldOCR = forceOCR || (useOCR && visibleChars < 25);
+        let canvas = null;
+
+        if (preserveImages || shouldOCR) canvas = await canvasForPage(page);
+        if (preserveImages) {
+          st.textContent = `Conservando la página original ${n} de ${pdf.numPages}…`;
+          pageImages.push(await canvasToJpeg(canvas));
+        } else pageImages.push(null);
+
+        if (shouldOCR) {
           if (!window.Tesseract) throw new Error('No se ha podido cargar el motor OCR. Comprueba la conexión.');
           if (!worker) {
             st.textContent = 'Preparando OCR. La primera vez puede tardar mientras se descargan el motor y el idioma…';
@@ -197,12 +217,13 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
             });
           }
           st.textContent = `Aplicando OCR a la página ${n} de ${pdf.numPages}…`;
-          const canvas = await canvasForPage(page);
+          if (!canvas) canvas = await canvasForPage(page);
           const result = await worker.recognize(canvas);
-          lines = String(result.data.text || '').split(/\r?\n/).map(clean).filter(Boolean);
-          canvas.width = 1; canvas.height = 1;
+          const ocrLines = String(result.data.text || '').split(/\r?\n/).map(clean).filter(Boolean);
+          if (forceOCR || visibleChars < 25) lines = ocrLines;
           ocrDone = true;
         }
+        if (canvas) { canvas.width = 1; canvas.height = 1; }
         pageLines.push(...lines, '');
         prog.value = Math.round(n/pdf.numPages*75);
         if (pdf.numPages > 250) {
@@ -238,9 +259,28 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
         spine.push(`<itemref idref="${id}"/>`);
         nav.push(`<li><a href="${href}">${esc(chapter.title)}</a></li>`);
       });
+      if ($('preserveImages').checked) {
+        zip.folder('OEBPS/images');
+        for (let i=0; i<pageImages.length; i++) {
+          const blob = pageImages[i];
+          if (!blob) continue;
+          const num = i + 1;
+          const imageName = `page-${num}.jpg`;
+          const xhtmlName = `original-page-${num}.xhtml`;
+          zip.file(`OEBPS/images/${imageName}`, blob);
+          const prev = num > 1 ? `<a href="original-page-${num-1}.xhtml">Página anterior</a>` : '';
+          const next = num < pageImages.length ? `<a href="original-page-${num+1}.xhtml">Página siguiente</a>` : '';
+          const originalXhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head><title>Página original ${num}</title><link rel="stylesheet" type="text/css" href="styles.css"/></head><body><h1>Página original ${num}</h1><p class="original-note">Imagen de la página tal como aparece en el PDF.</p><img class="original-page" src="images/${imageName}" alt="Página original ${num}" /><nav class="page-navigation">${prev}${prev && next ? ' · ' : ''}${next}</nav></body></html>`;
+          zip.file(`OEBPS/${xhtmlName}`, originalXhtml);
+          manifest.push(`<item id="orig${num}" href="${xhtmlName}" media-type="application/xhtml+xml"/>`);
+          manifest.push(`<item id="img${num}" href="images/${imageName}" media-type="image/jpeg"/>`);
+          spine.push(`<itemref idref="orig${num}"/>`);
+        }
+        nav.push('<li><a href="original-page-1.xhtml">Ver páginas originales del PDF</a></li>');
+      }
       const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="es" xml:lang="es"><head><title>Índice</title><link rel="stylesheet" type="text/css" href="styles.css"/></head><body><nav epub:type="toc" id="toc"><h1>Índice</h1><ol>${nav.join('')}</ol></nav></body></html>`;
       zip.file('OEBPS/nav.xhtml',navXhtml);
-      zip.file('OEBPS/styles.css',`html{font-size:100%}body{font-family:serif;line-height:1.65;margin:5%;orphans:2;widows:2}h1{font-size:1.35em;line-height:1.3;margin:1.6em 0 .8em;break-after:avoid}h1.book-title{font-size:1.65em;text-align:center;margin:1em 0 2em}p{margin:0 0 .85em;text-indent:1.1em;text-align:start}p+p{margin-top:0}.chapter-start{break-before:page;page-break-before:always}nav ol{padding-left:1.4em}nav li{margin:.6em 0}a{color:inherit}`);
+      zip.file('OEBPS/styles.css',`html{font-size:100%}body{font-family:serif;line-height:1.65;margin:5%;orphans:2;widows:2}h1{font-size:1.35em;line-height:1.3;margin:1.6em 0 .8em;break-after:avoid}h1.book-title{font-size:1.65em;text-align:center;margin:1em 0 2em}p{margin:0 0 .85em;text-indent:1.1em;text-align:start}p+p{margin-top:0}.chapter-start{break-before:page;page-break-before:always}nav ol{padding-left:1.4em}nav li{margin:.6em 0}a{color:inherit}img.original-page{display:block;width:100%;height:auto;max-width:100%;margin:1em auto}.original-note{font-size:.85em;text-indent:0}.page-navigation{display:flex;justify-content:space-between;margin-top:1em}`);
       const modified = new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
       zip.file('OEBPS/content.opf',`<?xml version="1.0" encoding="UTF-8"?>\n<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="es"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bookid">${esc(uid)}</dc:identifier><dc:title>${esc(title)}</dc:title><dc:language>es</dc:language><dc:creator>PDF a EPUB</dc:creator><meta property="dcterms:modified">${modified}</meta></metadata><manifest>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
       st.textContent = 'Creando archivo EPUB…';
@@ -254,7 +294,7 @@ ul{padding-left:22px;color:var(--muted);line-height:1.5}
       dl.textContent = `Descargar EPUB (${(blob.size/1024/1024).toFixed(2)} MB)`;
       dl.hidden = false;
       prog.value = 100;
-      st.textContent = `Conversión terminada: ${pdf.numPages} páginas, ${chapters.length} sección(es).${ocrDone ? '\nSe ha utilizado OCR en páginas sin texto seleccionable.' : '\nNo ha sido necesario utilizar OCR.'}\nComprueba el libro en Apple Books: la calidad depende del PDF original.`;
+      st.textContent = `Conversión terminada: ${pdf.numPages} páginas, ${chapters.length} sección(es).${ocrDone ? '\\nSe ha utilizado OCR.' : '\\nNo ha sido necesario utilizar OCR.'}${$('preserveImages').checked ? '\\nSe han incluido las páginas originales como imágenes al final del EPUB.' : ''}\\nComprueba el libro en Apple Books: la calidad depende del PDF original.`;
     } catch (e) {
       if (worker) { try { await worker.terminate(); } catch (_) {} }
       st.textContent = 'No se pudo convertir: ' + (e && e.message ? e.message : String(e)) + '\nComprueba la conexión, prueba con un PDF más corto y vuelve a intentarlo.';

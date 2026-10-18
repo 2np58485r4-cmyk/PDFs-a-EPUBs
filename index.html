@@ -1,33 +1,268 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f3ec"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="PDF a EPUB"><title>PDF a EPUB</title>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PDF a EPUB">
+<title>PDF a EPUB</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f3ec;color:#24221f;font-family:-apple-system,BlinkMacSystemFont,sans-serif}main{max-width:680px;margin:auto;padding:24px 18px 40px}h1{font-size:32px;margin:8px 0}p{line-height:1.5;color:#6f6a62}.card{background:#fffdf9;border:1px solid #e5ddd1;border-radius:18px;padding:18px;margin:14px 0}label{font-weight:650;display:block;margin:12px 0 8px}input[type=file],input[type=text]{width:100%;font:inherit;padding:12px;border:1px solid #e5ddd1;border-radius:12px;background:white}input[type=checkbox]{width:18px;height:18px}button,.download{display:block;width:100%;border:0;border-radius:12px;padding:15px;background:#9a4f2d;color:white;font-size:16px;font-weight:700;text-align:center;text-decoration:none;margin-top:14px}button:disabled{opacity:.45}.small{font-size:12px}#status{white-space:pre-wrap;font-size:14px;color:#24221f;margin-top:12px}
-</style></head><body><main><p style="color:#9a4f2d;font-weight:700;letter-spacing:.1em;font-size:12px">HERRAMIENTA PRIVADA · IPHONE</p><h1>PDF a EPUB</h1><p>Convierte un PDF en un libro adaptable para Apple Books.</p>
-<section class="card"><label for="pdf">1. Elige un PDF</label><input id="pdf" type="file" accept="application/pdf,.pdf"><p class="small">Esta versión funciona con PDF que contienen texto seleccionable. Los escaneos que son imágenes requieren OCR, aún no incluido.</p><label for="title">Título del libro (opcional)</label><input id="title" type="text" placeholder="Nombre del libro"><label style="font-weight:500"><input id="chapters" type="checkbox" checked> Intentar detectar capítulos</label><button id="convert" disabled>Convertir a EPUB</button><div id="status" role="status">Selecciona un PDF para empezar.</div><a id="download" class="download" hidden>Descargar EPUB</a></section>
-<section class="card"><b>Privacidad</b><p>El PDF se procesa en Safari en tu iPhone. Esta página no tiene función para enviar tus documentos al servidor. Necesita internet para cargar las bibliotecas de conversión.</p></section><section class="card"><b>Abrir en Apple Books</b><p>Cuando termine, toca Descargar EPUB y elige Libros en la hoja de compartir de iOS, o guarda el archivo en Archivos y ábrelo desde allí.</p><p class="small">El resultado conserva principalmente texto, no el diseño original, las imágenes o las tablas. La extracción y los capítulos son aproximados.</p></section>
+:root{color-scheme:light;--bg:#f7f3ec;--card:#fffdf9;--ink:#24221f;--muted:#6f6a62;--accent:#9a4f2d;--border:#e5ddd1}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:720px;margin:auto;padding:24px 18px 44px}
+h1{font-size:32px;line-height:1.15;margin:8px 0}
+h2{font-size:19px;margin:0 0 8px}
+p{line-height:1.5;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;margin:14px 0}
+label{font-weight:650;display:block;margin:14px 0 8px}
+input[type=file],input[type=text],select{width:100%;font:inherit;padding:12px;border:1px solid var(--border);border-radius:12px;background:white;color:var(--ink)}
+input[type=checkbox]{width:19px;height:19px;vertical-align:middle;margin-right:8px}
+.check{font-weight:500;line-height:1.45}
+button,.download{display:block;width:100%;border:0;border-radius:12px;padding:15px;background:var(--accent);color:white;font-size:16px;font-weight:700;text-align:center;text-decoration:none;margin-top:14px}
+button:disabled{opacity:.45}
+.small{font-size:12px}
+#status{white-space:pre-wrap;font-size:14px;color:var(--ink);margin-top:12px;line-height:1.5}
+progress{width:100%;height:12px;margin-top:10px;accent-color:var(--accent)}
+.note{background:#f4eadf;border-radius:12px;padding:12px;color:#5a4031;font-size:13px;line-height:1.45}
+ul{padding-left:22px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+<p style="color:var(--accent);font-weight:700;letter-spacing:.1em;font-size:12px">HERRAMIENTA PRIVADA · IPHONE</p>
+<h1>PDF a EPUB</h1>
+<p>Convierte documentos PDF en libros de texto adaptable para Apple Books.</p>
+
+<section class="card">
+<h2>1. Selecciona tu PDF</h2>
+<label for="pdf">Archivo PDF</label>
+<input id="pdf" type="file" accept="application/pdf,.pdf">
+<label for="title">Título del libro (opcional)</label>
+<input id="title" type="text" maxlength="180" placeholder="Nombre del libro">
+<label for="lang">Idioma para OCR</label>
+<select id="lang">
+  <option value="spa">Español</option>
+  <option value="eng">Inglés</option>
+  <option value="spa+eng" selected>Español e inglés</option>
+</select>
+<label class="check"><input id="ocr" type="checkbox" checked>Usar OCR en páginas escaneadas o sin texto seleccionable</label>
+<label class="check"><input id="chapters" type="checkbox" checked>Intentar detectar capítulos y crear un índice</label>
+<label class="check"><input id="pageBreaks" type="checkbox" checked>Comenzar cada capítulo en una página nueva</label>
+<button id="convert" disabled>Convertir a EPUB</button>
+<progress id="progress" value="0" max="100" hidden></progress>
+<div id="status" role="status" aria-live="polite">Selecciona un PDF para empezar.</div>
+<a id="download" class="download" hidden>Descargar EPUB</a>
+</section>
+
+<section class="card">
+<h2>Privacidad y funcionamiento</h2>
+<p>El PDF se procesa dentro de Safari en tu iPhone. Esta página no incluye ninguna función para enviar tu documento a un servidor. Para convertirlo necesita descargar las bibliotecas y, si usas OCR, los datos del idioma desde internet. Es posible que la primera conversión tarde un poco.</p>
+<div class="note">Consejo: empieza probando un PDF corto de unas pocas páginas. El OCR consume memoria y puede tardar bastante en documentos largos; mantén Safari abierto durante la conversión.</div>
+</section>
+
+<section class="card">
+<h2>Abrir en Apple Books</h2>
+<p>Cuando termine, toca <b>Descargar EPUB</b>. En la hoja de compartir de iOS elige Libros, o guarda el archivo en Archivos y ábrelo desde allí.</p>
+<p class="small">El resultado prioriza el texto adaptable. No reproduce exactamente el diseño del PDF y puede no conservar imágenes, tablas, notas, columnas o encabezados. La separación de párrafos y la detección de capítulos son aproximadas. El OCR puede cometer errores, especialmente con páginas borrosas o torcidas.</p>
+</section>
 </main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
-(()=>{const fi=document.querySelector('#pdf'),btn=document.querySelector('#convert'),st=document.querySelector('#status'),dl=document.querySelector('#download');let oldUrl=null;
-if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-fi.onchange=()=>{btn.disabled=!fi.files.length;dl.hidden=true;st.textContent=fi.files.length?'PDF seleccionado. Toca Convertir a EPUB.':'Selecciona un PDF para empezar.'};
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const slug=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'libro';
-btn.onclick=async()=>{if(!fi.files[0])return;btn.disabled=true;dl.hidden=true;try{
-if(!window.pdfjsLib||!window.JSZip)throw Error('No se han cargado las bibliotecas. Comprueba la conexión.');
-st.textContent='Leyendo PDF…';const file=fi.files[0],pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;let lines=[];
-for(let n=1;n<=pdf.numPages;n++){st.textContent=`Leyendo página ${n} de ${pdf.numPages}…`;const page=await pdf.getPage(n),items=(await page.getTextContent()).items;let row=[],y0=null;
-for(const it of items){const y=Math.round(it.transform?.[5]||0);if(y0!==null&&Math.abs(y-y0)>3){if(row.length)lines.push(row.join(' ').replace(/\s+/g,' ').trim());row=[];}row.push(it.str);y0=y;}if(row.length)lines.push(row.join(' ').replace(/\s+/g,' ').trim());lines.push('');}
-lines=lines.map(x=>x.trim()).filter(Boolean);if(!lines.length)throw Error('No se encontró texto seleccionable. Puede ser un PDF escaneado que necesita OCR.');
-const title=document.querySelector('#title').value.trim()||file.name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ');const paras=[];let buf=[];
-for(const line of lines){const heading=document.querySelector('#chapters').checked&&/^(CAP[IÍ]TULO|CHAPTER|PARTE\s+[IVX0-9]+|INTRODUCCI[ÓO]N|PR[ÓO]LOGO|EP[IÍ]LOGO|CONCLUSI[ÓO]N)\b/i.test(line);
-if(heading){if(buf.length)paras.push('<p>'+esc(buf.join(' '))+'</p>'),buf=[];paras.push('<h2>'+esc(line)+'</h2>');}else{buf.push(line);if(/[.!?…]["'»)]?$/.test(line)&&buf.join(' ').length>350){paras.push('<p>'+esc(buf.join(' '))+'</p>');buf=[];}}}if(buf.length)paras.push('<p>'+esc(buf.join(' '))+'</p>');
-st.textContent='Creando EPUB…';const zip=new JSZip();zip.file('mimetype','application/epub+zip',{compression:'STORE'});zip.file('META-INF/container.xml','<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
-const uid='urn:uuid:'+Date.now().toString(36)+Math.random().toString(36).slice(2),chapters=paras.join('\n');const xhtml=`<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><title>${esc(title)}</title><link rel="stylesheet" href="styles.css"/></head><body><h1>${esc(title)}</h1>${chapters}</body></html>`;
-zip.file('OEBPS/chapter1.xhtml',xhtml);zip.file('OEBPS/styles.css','body{font-family:serif;line-height:1.65;margin:5%;}h1{font-size:1.6em;margin-bottom:1.4em}h2{font-size:1.25em;margin-top:1.8em;break-before:page}p{margin:0 0 1em;text-indent:1em}');
-zip.file('OEBPS/nav.xhtml','<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="es"><head><title>Índice</title></head><body><nav epub:type="toc"><h1>Índice</h1><ol><li><a href="chapter1.xhtml">'+esc(title)+'</a></li></ol></nav></body></html>');
-zip.file('OEBPS/content.opf',`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id" xml:lang="es"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">${uid}</dc:identifier><dc:title>${esc(title)}</dc:title><dc:language>es</dc:language><meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d{3}Z$/,'Z')}</meta></metadata><manifest><item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/><item id="css" href="styles.css" media-type="text/css"/><item id="c1" href="chapter1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>`);
-const blob=await zip.generateAsync({type:'blob',mimeType:'application/epub+zip'});if(oldUrl)URL.revokeObjectURL(oldUrl);oldUrl=URL.createObjectURL(blob);dl.href=oldUrl;dl.download=slug(title)+'.epub';dl.textContent='Descargar EPUB ('+(blob.size/1024/1024).toFixed(2)+' MB)';dl.hidden=false;st.textContent=`Conversión terminada: ${pdf.numPages} páginas. Revisa el resultado; el texto y los títulos se detectan de forma aproximada.`;
-}catch(e){st.textContent='No se pudo convertir: '+(e.message||String(e));}finally{btn.disabled=false;}};
+(() => {
+  const $ = id => document.getElementById(id);
+  const fi = $('pdf'), btn = $('convert'), st = $('status'), dl = $('download'), prog = $('progress');
+  let oldUrl = null;
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  fi.addEventListener('change', () => {
+    btn.disabled = !fi.files || !fi.files.length;
+    dl.hidden = true;
+    st.textContent = fi.files.length ? 'PDF seleccionado. Toca Convertir a EPUB.' : 'Selecciona un PDF para empezar.';
+    prog.hidden = true;
+  });
+
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase().slice(0,100) || 'libro';
+  const clean = s => String(s || '').replace(/\u00ad/g,'').replace(/[ \t]+/g,' ').replace(/\s+([,.;:!?])/g,'$1').trim();
+  const isHeading = s => /^(CAP[IÍ]TULO|CHAPTER|CAPÍTULO|PARTE\s+[IVX0-9]+|INTRODUCCI[ÓO]N|PR[ÓO]LOGO|EP[IÍ]LOGO|CONCLUSI[ÓO]N|ANEXO|APÉNDICE)\b/i.test(s) || (/^[IVXLC\d]{1,8}[.)\-:]?\s+\S/.test(s) && s.length < 100);
+
+  function textFromItems(items) {
+    // Agrupa los elementos PDF por líneas, utilizando sus coordenadas.
+    const rows = new Map();
+    for (const it of items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = Math.round((it.transform && it.transform[5]) || 0);
+      let key = y;
+      while (rows.has(key) && Math.abs(key-y) > 2) key += key > y ? -1 : 1;
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key).push({x:(it.transform && it.transform[4]) || 0, text:it.str});
+    }
+    return [...rows.entries()]
+      .sort((a,b)=>b[0]-a[0])
+      .map(([,parts])=>parts.sort((a,b)=>a.x-b.x).map(p=>p.text).join(' ').replace(/\s+/g,' ').trim())
+      .filter(Boolean);
+  }
+
+  function canvasForPage(page) {
+    const viewport = page.getViewport({scale:1.55});
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    return page.render({canvasContext:canvas.getContext('2d',{willReadFrequently:false}), viewport}).promise.then(()=>canvas);
+  }
+
+  function makeParagraphs(pageLines, useChapters) {
+    const blocks = [];
+    let buffer = [];
+    const flush = () => {
+      const value = clean(buffer.join(' '));
+      if (value) blocks.push({type:'p', text:value});
+      buffer = [];
+    };
+    for (let i=0;i<pageLines.length;i++) {
+      let line = clean(pageLines[i]);
+      if (!line) { flush(); continue; }
+      line = line.replace(/-\s*$/,'-');
+      const heading = useChapters && isHeading(line);
+      if (heading) {
+        flush();
+        blocks.push({type:'h',text:line});
+        continue;
+      }
+      // Mantiene líneas juntas para recomponer párrafos y separa al llegar a puntuación.
+      if (buffer.length && /^[A-ZÁÉÍÓÚÜÑ¿¡“"(\[]/.test(line) && /[.!?…:;]["'»)]?$/.test(buffer[buffer.length-1])) flush();
+      if (buffer.length && /-\s*$/.test(buffer[buffer.length-1])) {
+        buffer[buffer.length-1] = buffer[buffer.length-1].replace(/-\s*$/,'') + line.replace(/^[a-záéíóúüñ]/,'');
+      } else buffer.push(line);
+      const joined = buffer.join(' ');
+      if (/[.!?…]["'»)]?$/.test(line) && joined.length > 220) flush();
+      if (joined.length > 950) flush();
+    }
+    flush();
+    return blocks;
+  }
+
+  function splitIntoChapters(blocks, title, enabled) {
+    if (!enabled) return [{title, blocks}];
+    const result = [];
+    let current = {title, blocks:[]};
+    let found = false;
+    for (const b of blocks) {
+      if (b.type === 'h') {
+        if (current.blocks.length) result.push(current);
+        current = {title:b.text, blocks:[b]};
+        found = true;
+      } else current.blocks.push(b);
+    }
+    if (current.blocks.length) result.push(current);
+    return found ? result : [{title, blocks}];
+  }
+
+  btn.addEventListener('click', async () => {
+    const file = fi.files && fi.files[0];
+    if (!file) return;
+    btn.disabled = true; dl.hidden = true; prog.hidden = false; prog.value = 0;
+    let worker = null;
+    try {
+      if (!window.pdfjsLib || !window.JSZip) throw new Error('No se han cargado las bibliotecas de PDF o EPUB. Comprueba tu conexión y vuelve a intentarlo.');
+      if (!file.size) throw new Error('El archivo está vacío.');
+      st.textContent = 'Abriendo PDF…';
+      const pdf = await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+      const pageLines = [];
+      const useOCR = $('ocr').checked;
+      let ocrDone = false;
+      const lang = $('lang').value;
+
+      for (let n=1;n<=pdf.numPages;n++) {
+        st.textContent = `Leyendo página ${n} de ${pdf.numPages}…`;
+        const page = await pdf.getPage(n);
+        let lines = textFromItems((await page.getTextContent()).items);
+        const visibleChars = lines.join(' ').replace(/\s/g,'').length;
+        if (useOCR && visibleChars < 25) {
+          if (!window.Tesseract) throw new Error('No se ha podido cargar el motor OCR. Comprueba la conexión.');
+          if (!worker) {
+            st.textContent = 'Preparando OCR. La primera vez puede tardar mientras se descargan el motor y el idioma…';
+            worker = await Tesseract.createWorker(lang, 1, {
+              logger: m => {
+                if (m && m.status) {
+                  const pct = typeof m.progress === 'number' ? ` (${Math.round(m.progress*100)}%)` : '';
+                  st.textContent = `Preparando OCR: ${m.status}${pct}`;
+                }
+              }
+            });
+          }
+          st.textContent = `Aplicando OCR a la página ${n} de ${pdf.numPages}…`;
+          const canvas = await canvasForPage(page);
+          const result = await worker.recognize(canvas);
+          lines = String(result.data.text || '').split(/\r?\n/).map(clean).filter(Boolean);
+          canvas.width = 1; canvas.height = 1;
+          ocrDone = true;
+        }
+        pageLines.push(...lines, '');
+        prog.value = Math.round(n/pdf.numPages*75);
+        if (pdf.numPages > 250) {
+          st.textContent = `Documento largo: página ${n} de ${pdf.numPages}. La conversión puede tardar y consumir bastante memoria.`;
+        }
+      }
+      if (worker) { await worker.terminate(); worker = null; }
+
+      const allLines = pageLines.map(clean);
+      if (!allLines.some(Boolean)) throw new Error('No se ha encontrado texto. Prueba con otro PDF o comprueba que las páginas se vean nítidas.');
+      st.textContent = 'Organizando párrafos y capítulos…';
+      const title = clean($('title').value) || file.name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ');
+      const blocks = makeParagraphs(allLines, $('chapters').checked);
+      if (!blocks.length) throw new Error('No se pudo extraer texto utilizable de este PDF.');
+      const chapters = splitIntoChapters(blocks, title, $('chapters').checked);
+      const zip = new JSZip();
+      zip.file('mimetype','application/epub+zip',{compression:'STORE'});
+      zip.file('META-INF/container.xml','<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+
+      const uid = 'urn:uuid:' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2));
+      const manifest = ['<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>','<item id="css" href="styles.css" media-type="text/css"/>'];
+      const spine = [];
+      const nav = [];
+      chapters.forEach((chapter, index) => {
+        const id = `ch${index+1}`, href = `${id}.xhtml`;
+        const body = chapter.blocks.map(b => b.type === 'h'
+          ? `<h1 id="heading-${index+1}">${esc(b.text)}</h1>`
+          : `<p>${esc(b.text)}</p>`).join('\n');
+        const pageBreak = $('pageBreaks').checked && index > 0 ? ' chapter-start' : '';
+        const xhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head><title>${esc(chapter.title)}</title><link rel="stylesheet" type="text/css" href="styles.css"/></head><body class="${pageBreak.trim()}"><h1 class="book-title">${esc(title)}</h1>${body}</body></html>`;
+        zip.file(`OEBPS/${href}`,xhtml);
+        manifest.push(`<item id="${id}" href="${href}" media-type="application/xhtml+xml"/>`);
+        spine.push(`<itemref idref="${id}"/>`);
+        nav.push(`<li><a href="${href}">${esc(chapter.title)}</a></li>`);
+      });
+      const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="es" xml:lang="es"><head><title>Índice</title><link rel="stylesheet" type="text/css" href="styles.css"/></head><body><nav epub:type="toc" id="toc"><h1>Índice</h1><ol>${nav.join('')}</ol></nav></body></html>`;
+      zip.file('OEBPS/nav.xhtml',navXhtml);
+      zip.file('OEBPS/styles.css',`html{font-size:100%}body{font-family:serif;line-height:1.65;margin:5%;orphans:2;widows:2}h1{font-size:1.35em;line-height:1.3;margin:1.6em 0 .8em;break-after:avoid}h1.book-title{font-size:1.65em;text-align:center;margin:1em 0 2em}p{margin:0 0 .85em;text-indent:1.1em;text-align:start}p+p{margin-top:0}.chapter-start{break-before:page;page-break-before:always}nav ol{padding-left:1.4em}nav li{margin:.6em 0}a{color:inherit}`);
+      const modified = new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
+      zip.file('OEBPS/content.opf',`<?xml version="1.0" encoding="UTF-8"?>\n<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="es"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bookid">${esc(uid)}</dc:identifier><dc:title>${esc(title)}</dc:title><dc:language>es</dc:language><dc:creator>PDF a EPUB</dc:creator><meta property="dcterms:modified">${modified}</meta></metadata><manifest>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
+      st.textContent = 'Creando archivo EPUB…';
+      prog.value = 85;
+      const blob = await zip.generateAsync({type:'blob',mimeType:'application/epub+zip',compression:'DEFLATE',compressionOptions:{level:5}}, meta => {
+        prog.value = 85 + Math.round(meta.percent * .15);
+      });
+      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      oldUrl = URL.createObjectURL(blob);
+      dl.href = oldUrl; dl.download = slug(title)+'.epub';
+      dl.textContent = `Descargar EPUB (${(blob.size/1024/1024).toFixed(2)} MB)`;
+      dl.hidden = false;
+      prog.value = 100;
+      st.textContent = `Conversión terminada: ${pdf.numPages} páginas, ${chapters.length} sección(es).${ocrDone ? '\nSe ha utilizado OCR en páginas sin texto seleccionable.' : '\nNo ha sido necesario utilizar OCR.'}\nComprueba el libro en Apple Books: la calidad depende del PDF original.`;
+    } catch (e) {
+      if (worker) { try { await worker.terminate(); } catch (_) {} }
+      st.textContent = 'No se pudo convertir: ' + (e && e.message ? e.message : String(e)) + '\nComprueba la conexión, prueba con un PDF más corto y vuelve a intentarlo.';
+    } finally {
+      btn.disabled = !(fi.files && fi.files.length);
+    }
+  });
 })();
-</script></body></html>
+</script>
+</body>
+</html>
